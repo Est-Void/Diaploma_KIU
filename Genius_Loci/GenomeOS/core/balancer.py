@@ -34,9 +34,9 @@ class BalancerController:
             integral_limits=(-15, 15)
         )
 
-        self.wheelbase = 0.4 #config["wheelbase_m"]
-        self.track_width = 0.3 #config["track_width_m"]
-        self.gripper_leverage = 0.15 #config["gripper_leverage_m"]
+        self.wheelbase = config["wheelbase_m"]
+        self.track_width = config["track_width_m"]
+        self.gripper_leverage = config["gripper_leverage_m"]
         self.speed_to_angle = config["speed_to_angle_gain"]
         self.emergency_threshold = config.get("emergency_tilt_threshold_deg", 25.0)
 
