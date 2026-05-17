@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from config.hw_config import *
 from core.logger import setup_logging, get_logger
 from core.balancer import BalancerController
-from core.pid import PIDController
+from core.indicator_controller import IndicatorController, RobotStatus
 
 from hw_abstraction.hardware_interface import HardwareInterface
 
@@ -147,6 +147,7 @@ class GeniusLociOS:
         """Initialize control modules."""
         self.movement = MovementController(ROBOT_CONFIG)
         self.gripper = GripperController(NODES_CONFIG["pneumatic_gripper"])
+        self.indicator = IndicatorController(NODES_CONFIG.get("indicator", {}), use_mock=True)
 
     def _init_communication(self):
         """Initialize communication bus."""
@@ -171,8 +172,10 @@ class GeniusLociOS:
         elif cmd_type == "emergency_stop":
             self.movement.emergency_stop()
             self.hw.emergency_stop()
+            self.indicator.set_status(RobotStatus.CRASH_EMERGENCY, force_sound=True)
         elif cmd_type == "clear_emergency":
             self.movement.clear_emergency()
+            self.indicator.set_status(RobotStatus.IDLE)
         elif cmd_type == "execute_task":
             self.logger.info(f"Received task: {cmd.get('task', {})}")
             self.state.current_task = cmd.get("task", {}).get("id")
@@ -211,6 +214,9 @@ class GeniusLociOS:
         """Single control cycle update."""
         # Update hardware simulation
         self.hw.update_all(dt)
+
+        # Update indicator (LEDs, buzzer)
+        self.indicator.update(dt)
 
         # Update sensors
         v_left = self.movement.pose.v - self.movement.pose.w * ROBOT_CONFIG["track_width_m"] / 2
@@ -270,6 +276,26 @@ class GeniusLociOS:
         self.state.has_payload = gripper_data["is_holding"]
         self.state.slam_keyframes = len(self.slam.keyframes)
         self.state.status = "running" if self._running else "idle"
+
+        # Update indicator based on system state
+        self._update_indicator(balance_result)
+
+    def _update_indicator(self, balance_result: Dict):
+        """Map system state to indicator status."""
+        if balance_result.get("emergency"):
+            self.indicator.set_status(RobotStatus.CRASH_EMERGENCY)
+        elif self.state.stability_score < 0.4:
+            self.indicator.set_status(RobotStatus.BLOCKED)
+        elif self.state.battery_percent < 15:
+            self.indicator.set_status(RobotStatus.LOW_BATTERY)
+        elif self.gripper.is_holding_payload:
+            self.indicator.set_status(RobotStatus.GRABBING)
+        elif self.state.status in ("moving", "task_assigned"):
+            self.indicator.set_status(RobotStatus.NAVIGATE)
+        elif self.state.status == "idle":
+            self.indicator.set_status(RobotStatus.IDLE)
+        else:
+            self.indicator.set_status(RobotStatus.IDLE)
 
     def _depth_to_scan(self, depth_map: np.ndarray, fov_deg: float = 90) -> list:
         """Convert depth map to 2D laser scan points."""
