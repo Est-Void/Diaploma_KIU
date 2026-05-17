@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply text-gray-900 antialiased;
+  }
+}
+
+@layer components {
+  .custom-robot-marker {
+    background: none;
+    border: none;
+  }
+
+  .leaflet-container {
+    @apply rounded-lg;
+  }
+}

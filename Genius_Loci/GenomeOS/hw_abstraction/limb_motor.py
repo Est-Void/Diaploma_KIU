@@ -1,32 +1,43 @@
-import math
+"""
+Simulated limb motor for robot legs.
+"""
+from typing import Dict, Any
 from hw_abstraction.base_node import BaseNode
 
+
 class LimbMotor(BaseNode):
-    def __init__(self, node_id: str, config: dict):
-        super().__init__(node_id, config)
-        self.current_angle = 0.0 # Относительно корпуса
+    """Simulated limb motor with angle control."""
 
-    def update(self, dt: float, target_angle: float, payload_weight: float = 0.0, **kwargs):
-        if not self.is_active: return
-        
-        k = self.config["inertia_factor"]
-        friction = self.config["friction_coeff"]
-        max_spd = self.config["max_speed_deg_per_sec"]
-        gravity = self.config["gravity_effect"]
+    def __init__(self, name: str, config: Dict[str, Any]):
+        super().__init__(name, config)
+        self._current_angle = 0.0
+        self._target_angle = 0.0
+        self.max_angle = config["max_angle_deg"]
+        self.max_speed = config["max_speed_deg_per_sec"]
+        self.inertia = config["inertia_factor"]
+        self.friction = config["friction_coeff"]
+        self.gravity = config["gravity_effect"]
 
-        # Гравитация мешает поднимать груз (если угол положительный - подъем)
-        gravity_drag = gravity * payload_weight * math.sin(math.radians(self.current_angle))
-        
-        # Расчет скорости с ограничением
-        error = target_angle - self.current_angle
-        desired_speed = error * k * 10 - (friction * self.current_angle) - gravity_drag
-        actual_speed = max(-max_spd, min(max_spd, desired_speed))
-        
-        self.current_angle += actual_speed * dt
-        self.current_angle = max(-self.config["max_angle_deg"], 
-                                 min(self.config["max_angle_deg"], self.current_angle))
-                                 
-        self.logger.debug(f"Angle: {self.current_angle:.2f}° | Target: {target_angle:.2f}°")
+    def read(self) -> Dict[str, Any]:
+        return {
+            "angle_deg": self._current_angle,
+            "target_deg": self._target_angle,
+            "active": self.is_active
+        }
 
-    def get_state(self) -> dict:
-        return {"node_id": self.node_id, "type": "limb_motor", "angle_deg": round(self.current_angle, 2)}
+    def write(self, command: Dict[str, Any]) -> bool:
+        target = command.get("angle_deg", 0.0)
+        self._target_angle = max(-self.max_angle, min(self.max_angle, target))
+        return True
+
+    def update(self, dt: float):
+        super().update(dt)
+        error = self._target_angle - self._current_angle
+        speed = error * (1 - self.inertia) * 10
+        speed = max(-self.max_speed, min(self.max_speed, speed))
+        self._current_angle += speed * dt
+        self._current_angle *= (1 - self.friction * dt)
+
+    def reset(self):
+        self._current_angle = 0.0
+        self._target_angle = 0.0

@@ -1,36 +1,58 @@
+"""
+Simulated pneumatic gripper with pressure-based force control.
+"""
+from typing import Dict, Any
 from hw_abstraction.base_node import BaseNode
 
+
 class PneumaticGripper(BaseNode):
-    def __init__(self, node_id: str, config: dict):
-        super().__init__(node_id, config)
-        self.current_pressure = 0.0
-        self.is_gripping = False
+    """Simulated pneumatic gripper with realistic pressure dynamics."""
 
-    def update(self, dt: float, command: str = "hold", **kwargs):
-        if not self.is_active: return
+    def __init__(self, name: str, config: Dict[str, Any]):
+        super().__init__(name, config)
+        self._pressure = 0.0
+        self._target_pressure = 0.0
+        self._is_gripping = False
+        self.max_pressure = config["max_pressure_bar"]
+        self.pump_rate = config["pump_rate"]
+        self.leak_rate = config["leak_rate"]
+        self.force_per_bar = config["grip_force_per_bar"]
+        self.max_force = config.get("max_grip_force_n", 200.0)
 
-        pump_rate = self.config["pump_rate"]
-        leak_rate = self.config["leak_rate"]
-
-        if command == "grip":
-            self.is_gripping = True
-            self.current_pressure += pump_rate * dt
-        elif command == "release":
-            self.is_gripping = False
-            self.current_pressure -= pump_rate * dt * 1.5 # Стравливает быстрее
-        else: # hold
-            self.current_pressure -= leak_rate * dt
-
-        self.current_pressure = max(0.0, min(self.config["max_pressure_bar"], self.current_pressure))
-        
-        force = self.current_pressure * self.config["grip_force_per_bar"]
-        self.logger.debug(f"Pressure: {self.current_pressure:.2f} bar | Force: {force:.1f} N | Cmd: {command}")
-
-    def get_state(self) -> dict:
-        force = self.current_pressure * self.config["grip_force_per_bar"]
+    def read(self) -> Dict[str, Any]:
+        current_force = min(self._pressure * self.force_per_bar, self.max_force)
         return {
-            "node_id": self.node_id, "type": "gripper", 
-            "pressure_bar": round(self.current_pressure, 2),
-            "grip_force_N": round(force, 1),
-            "is_holding": self.current_pressure > 1.0
+            "pressure_bar": round(self._pressure, 2),
+            "force_n": round(current_force, 1),
+            "is_gripping": self._is_gripping,
+            "active": self.is_active
         }
+
+    def write(self, command: Dict[str, Any]) -> bool:
+        action = command.get("action", "hold")
+        if action == "grip":
+            target = command.get("pressure", self.max_pressure * 0.8)
+            self._target_pressure = min(target, self.max_pressure)
+            self._is_gripping = True
+        elif action == "release":
+            self._target_pressure = 0.0
+            self._is_gripping = False
+        elif action == "hold":
+            pass
+        return True
+
+    def update(self, dt: float):
+        super().update(dt)
+        if self._pressure < self._target_pressure:
+            self._pressure = min(self._target_pressure, 
+                                self._pressure + self.pump_rate * dt)
+        elif self._pressure > self._target_pressure:
+            self._pressure = max(self._target_pressure, 
+                                self._pressure - self.pump_rate * dt * 2)
+        # Natural leak
+        self._pressure = max(0, self._pressure - self.leak_rate * dt)
+
+    def reset(self):
+        self._pressure = 0.0
+        self._target_pressure = 0.0
+        self._is_gripping = False

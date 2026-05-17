@@ -1,24 +1,65 @@
+"""
+Simulated wheel motor with realistic dynamics.
+"""
+import time
+from typing import Dict, Any
 from hw_abstraction.base_node import BaseNode
 
+
 class WheelMotor(BaseNode):
-    def __init__(self, node_id: str, config: dict):
-        super().__init__(node_id, config)
-        self.current_rpm = 0.0
+    """Simulated wheel motor with inertia, friction, and load effects."""
 
-    def update(self, dt: float, target_rpm: float, payload_weight: float = 0.0, **kwargs):
-        if not self.is_active: return
+    def __init__(self, name: str, config: Dict[str, Any]):
+        super().__init__(name, config)
+        self._current_rpm = 0.0
+        self._target_rpm = 0.0
+        self._current_angle = 0.0
+        self._encoder_ticks = 0
+        self._total_distance_m = 0.0
 
-        k = self.config["inertia_factor"]
-        resistance = self.config["rolling_resistance"]
-        load_drop = self.config["load_effect"] * payload_weight
+        self.max_rpm = config["max_rpm"]
+        self.inertia = config["inertia_factor"]
+        self.friction = config["rolling_resistance"]
+        self.load_effect = config["load_effect"]
+        self.encoder_resolution = config.get("encoder_ticks_per_rev", 1024)
 
-        # Экспоненциальное приближение к целевому RPM с учетом сопротивления и груза
-        effective_target = target_rpm - load_drop
-        self.current_rpm += (effective_target - self.current_rpm) * k
-        self.current_rpm -= resistance * self.current_rpm # трение качения
-        self.current_rpm = max(-self.config["max_rpm"], min(self.config["max_rpm"], self.current_rpm))
+    def read(self) -> Dict[str, Any]:
+        """Return current motor state."""
+        return {
+            "rpm": self._current_rpm,
+            "angle_deg": self._current_angle,
+            "encoder_ticks": int(self._encoder_ticks),
+            "distance_m": round(self._total_distance_m, 4),
+            "active": self.is_active
+        }
 
-        self.logger.debug(f"RPM: {self.current_rpm:.2f} | Target: {target_rpm:.2f}")
+    def write(self, command: Dict[str, Any]) -> bool:
+        """Set target RPM."""
+        target = command.get("rpm", 0.0)
+        self._target_rpm = max(-self.max_rpm, min(self.max_rpm, target))
+        return True
 
-    def get_state(self) -> dict:
-        return {"node_id": self.node_id, "type": "wheel_motor", "rpm": round(self.current_rpm, 2)}
+    def update(self, dt: float):
+        """Update motor physics simulation."""
+        super().update(dt)
+
+        # Apply inertia
+        error = self._target_rpm - self._current_rpm
+        self._current_rpm += error * (1 - self.inertia) * dt * 5
+
+        # Apply friction
+        self._current_rpm *= (1 - self.friction * dt)
+
+        # Update encoder and distance
+        wheel_circumference = 3.14159 * 0.15  # 150mm diameter
+        revs_per_sec = self._current_rpm / 60.0
+        self._encoder_ticks += revs_per_sec * self.encoder_resolution * dt
+        self._total_distance_m += revs_per_sec * wheel_circumference * dt
+        self._current_angle += self._current_rpm * 6.0 * dt  # rpm * 6 = deg/sec
+
+    def reset(self):
+        self._current_rpm = 0.0
+        self._target_rpm = 0.0
+        self._current_angle = 0.0
+        self._encoder_ticks = 0
+        self._total_distance_m = 0.0

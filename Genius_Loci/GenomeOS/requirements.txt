@@ -1,0 +1,21 @@
+# Genius Loci GenomeOS - Robot Software Requirements
+numpy>=1.24.0
+opencv-python>=4.8.0
+pyzmq>=25.0.0
+
+# Server Requirements
+fastapi>=0.104.0
+uvicorn>=0.24.0
+sqlalchemy>=2.0.0
+asyncpg>=0.29.0
+psycopg2-binary>=2.9.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.0
+python-multipart>=0.0.6
+pydantic>=2.0.0
+
+# Optional: ONNX Runtime for YOLO acceleration
+# onnxruntime>=1.16.0
+
+# Optional: WebSocket client for robot-server bridge
+# websocket-client>=1.6.0
