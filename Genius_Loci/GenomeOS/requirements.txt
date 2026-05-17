@@ -17,5 +17,8 @@ pydantic>=2.0.0
 # Optional: ONNX Runtime for YOLO acceleration
 # onnxruntime>=1.16.0
 
-# Optional: WebSocket client for robot-server bridge
-# websocket-client>=1.6.0
+# WebSocket client for simulation
+websockets>=12.0
+
+# Optional: ONNX Runtime for YOLO acceleration
+# onnxruntime>=1.16.0

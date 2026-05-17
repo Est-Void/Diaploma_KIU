@@ -2,19 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  body {
-    @apply text-gray-900 antialiased;
-  }
+/* Leaflet custom styles */
+.leaflet-container {
+  font-family: inherit;
+  background: #f8fafc;
 }
 
-@layer components {
-  .custom-robot-marker {
-    background: none;
-    border: none;
-  }
+.custom-robot-marker {
+  background: none;
+  border: none;
+}
 
-  .leaflet-container {
-    @apply rounded-lg;
-  }
+.robot-marker-inner {
+  transition: transform 0.3s ease;
+}
+
+.coord-label {
+  background: none;
+  border: none;
+}
+
+.aisle-label {
+  background: none;
+  border: none;
+}
+
+/* Leaflet popup styling */
+.leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  padding: 0;
+}
+
+.leaflet-popup-content {
+  margin: 12px 16px;
+  line-height: 1.6;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  top: 8px;
+  right: 8px;
+  color: #94a3b8;
+  font-size: 18px;
+}
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: #475569;
+}
+
+/* Smooth scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* Pulse ring for status indicators */
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+.status-pulse::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: inherit;
+  animation: pulse-ring 1.5s ease-out infinite;
 }

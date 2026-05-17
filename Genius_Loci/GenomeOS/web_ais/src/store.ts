@@ -10,6 +10,16 @@ export interface Robot {
   battery: number
   currentTaskId?: string
   lastSeen: string
+  // Extended telemetry
+  velocity?: { linear: number; angular: number }
+  stabilityScore?: number
+  gripperState?: string
+  hasPayload?: boolean
+  payloadWeightKg?: number
+  imu?: { pitch: number; roll: number; yaw: number }
+  encoder?: { left: number; right: number }
+  slamKeyframes?: number
+  pathWaypoints?: number
 }
 
 export interface Task {
@@ -26,12 +36,23 @@ export interface Task {
   createdAt: string
 }
 
+export interface User {
+  id: number
+  username: string
+  role: 'operator' | 'admin'
+}
+
 interface AppState {
   robots: Robot[]
   tasks: Task[]
   selectedRobotId: string | null
   wsConnected: boolean
   mapData: string | null
+  // Auth
+  user: User | null
+  token: string | null
+  isAuthenticated: boolean
+  // Actions
   setRobots: (robots: Robot[]) => void
   updateRobot: (robot: Robot) => void
   setTasks: (tasks: Task[]) => void
@@ -39,6 +60,9 @@ interface AppState {
   setSelectedRobot: (id: string | null) => void
   setWsConnected: (connected: boolean) => void
   setMapData: (data: string) => void
+  // Auth actions
+  login: (user: User, token: string) => void
+  logout: () => void
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -47,6 +71,10 @@ export const useStore = create<AppState>((set) => ({
   selectedRobotId: null,
   wsConnected: false,
   mapData: null,
+  user: null,
+  token: localStorage.getItem('token'),
+  isAuthenticated: !!localStorage.getItem('token'),
+
   setRobots: (robots) => set({ robots }),
   updateRobot: (robot) => set((state) => ({
     robots: state.robots.map(r => r.id === robot.id ? robot : r)
@@ -56,4 +84,15 @@ export const useStore = create<AppState>((set) => ({
   setSelectedRobot: (id) => set({ selectedRobotId: id }),
   setWsConnected: (connected) => set({ wsConnected: connected }),
   setMapData: (data) => set({ mapData: data }),
+
+  login: (user, token) => {
+    localStorage.setItem('token', token)
+    localStorage.setItem('user', JSON.stringify(user))
+    set({ user, token, isAuthenticated: true })
+  },
+  logout: () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    set({ user: null, token: null, isAuthenticated: false })
+  }
 }))

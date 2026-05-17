@@ -254,7 +254,7 @@ class GeniusLociOS:
         slam_pose = self.slam.update(
             odometry_delta=(odom_dx, odom_dy, odom_dtheta),
             scan=scan_points,
-            timestamp=now
+            timestamp=pow
         )
 
         # Update costmap for planners
@@ -262,7 +262,7 @@ class GeniusLociOS:
             self.astar.set_map(self.slam.get_map())
 
         # Update state
-        self.state.timestamp = now
+        self.state.timestamp = pow
         self.state.pose = movement_data["pose"]
         self.state.velocity = movement_data["velocity"]
         self.state.stability_score = balance_result["stability_score"]
