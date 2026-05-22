@@ -49,6 +49,11 @@ class SimRobot:
     slam_keyframes: int = 0
     path_waypoints: int = 0
     current_task_id: Optional[str] = None
+    # Task execution state
+    task_phase: str = "idle"  # idle, moving_to_pickup, picking, moving_to_dropoff, dropping
+    task_pickup: tuple = (0, 0)
+    task_dropoff: tuple = (0, 0)
+    task_timer: float = 0.0
 
     def to_telemetry(self) -> dict:
         return {
@@ -76,9 +81,30 @@ class MultiRobotSimulation:
 
     # Warehouse waypoints for patrol routes
     WAYPOINTS = [
-        (-40, -40), (-40, 0), (-40, 40), (0, 40), (40, 40),
-        (40, 0), (40, -40), (0, -40), (-20, -20), (-20, 20),
-        (20, 20), (20, -20), (0, 0)
+        (-80, -80), (-80, -40), (-80, 0), (-80, 40), (-80, 80),
+        (-40, -80), (-40, 40), (-40, 80),
+        (0, -80), (0, -30), (0, 30), (0, 80),
+        (40, -80), (40, -40), (40, 40), (40, 80),
+        (80, -80), (80, -40), (80, 0), (80, 40), (80, 80),
+        (-60, -60), (-60, 20), (-60, 60),
+        (20, -60), (20, 20), (20, 60),
+        (60, -60), (60, 20), (60, 60),
+        (0, 0),
+    ]
+
+    # Obstacles: list of (x1, y1, x2, y2) bounding boxes
+    OBSTACLES = [
+        (-70, -80, -50, -40), (-70, -30, -50, 10), (-70, 20, -50, 60), (-70, 70, -50, 90),
+        (-20, -80, 0, -40), (-20, -30, 0, 10), (-20, 20, 0, 60), (-20, 70, 0, 90),
+        (30, -80, 50, -40), (30, -30, 50, 10), (30, 20, 50, 60), (30, 70, 50, 90),
+        (60, -60, 80, -20), (60, -10, 80, 30), (60, 40, 80, 80),
+        # Pillars (as small boxes)
+        (-43, -43, -37, -37), (37, 37, 43, 43), (-3, -3, 3, 3),
+        (-43, 47, -37, 53), (47, -53, 53, -47),
+        # Docks
+        (-90, 85, -75, 98), (75, 85, 90, 98), (-98, -60, -75, -45),
+        # Charging station
+        (80, -98, 95, -80),
     ]
 
     def __init__(self, robot_count: int = 3, server_url: str = "ws://localhost:8000"):
@@ -145,81 +171,179 @@ class MultiRobotSimulation:
 
     def _update_robot(self, robot: SimRobot, dt: float):
         """Update single robot state for one timestep."""
-        # Random behavior changes
-        if random.random() < 0.005:
-            robot.status = random.choice(["free", "busy", "charging"])
+        # Battery drain
+        if robot.status != "charging":
+            robot.battery = max(0, robot.battery - 0.008)
 
-        if robot.status == "charging":
-            robot.battery = min(100, robot.battery + 0.5)
+        # Charging behavior
+        if robot.status == "charging" or robot.battery < 15:
+            robot.status = "charging"
+            robot.battery = min(100, robot.battery + 1.0)
             robot.linear_vel = 0
             robot.angular_vel = 0
+            if robot.battery > 90:
+                robot.status = "free"
             return
 
-        # Movement towards random waypoint
-        if random.random() < 0.02:
-            robot.current_task_id = f"TASK-{random.randint(1000, 9999)}"
-
-        target = random.choice(self.WAYPOINTS)
-        dx = target[0] - robot.x
-        dy = target[1] - robot.y
-        dist = math.sqrt(dx*dx + dy*dy)
-
-        if dist > 1.0:
-            target_theta = math.atan2(dy, dx)
-            angle_diff = target_theta - robot.theta
-            while angle_diff > math.pi:
-                angle_diff -= 2 * math.pi
-            while angle_diff < -math.pi:
-                angle_diff += 2 * math.pi
-
-            robot.angular_vel = angle_diff * 0.5 + random.uniform(-0.1, 0.1)
-            robot.linear_vel = min(1.2, dist * 0.1) + random.uniform(-0.05, 0.05)
-            robot.theta += robot.angular_vel * dt
-            robot.x += robot.linear_vel * math.cos(robot.theta) * dt
-            robot.y += robot.linear_vel * math.sin(robot.theta) * dt
-        else:
+        # Task execution
+        if robot.task_phase == "moving_to_pickup":
+            self._move_towards(robot, robot.task_pickup, dt)
+            if self._distance(robot, robot.task_pickup) < 2.0:
+                robot.task_phase = "picking"
+                robot.task_timer = 2.0
+                robot.gripper_state = "grabbing"
+        elif robot.task_phase == "picking":
             robot.linear_vel = 0
             robot.angular_vel = 0
-            robot.current_task_id = None
+            robot.task_timer -= dt
+            if robot.task_timer <= 0:
+                robot.has_payload = True
+                robot.payload_weight_kg = random.uniform(5, 40)
+                robot.gripper_state = "holding"
+                robot.task_phase = "moving_to_dropoff"
+        elif robot.task_phase == "moving_to_dropoff":
+            self._move_towards(robot, robot.task_dropoff, dt)
+            if self._distance(robot, robot.task_dropoff) < 2.0:
+                robot.task_phase = "dropping"
+                robot.task_timer = 1.5
+                robot.gripper_state = "releasing"
+        elif robot.task_phase == "dropping":
+            robot.linear_vel = 0
+            robot.angular_vel = 0
+            robot.task_timer -= dt
+            if robot.task_timer <= 0:
+                robot.has_payload = False
+                robot.payload_weight_kg = 0
+                robot.gripper_state = "idle"
+                robot.task_phase = "idle"
+                robot.status = "free"
+                robot.current_task_id = None
+        else:
+            # Free roaming between waypoints
+            if random.random() < 0.01:
+                target = random.choice(self.WAYPOINTS)
+                robot.task_pickup = target  # reuse as target
+            self._move_towards(robot, robot.task_pickup, dt)
 
-        # Update encoders
+        # Update encoders & IMU
         robot.encoder_left += robot.linear_vel * dt * 100
         robot.encoder_right += robot.linear_vel * dt * 100
-
-        # Update IMU
         robot.imu_pitch = random.uniform(-0.05, 0.05)
         robot.imu_roll = random.uniform(-0.03, 0.03)
-
-        # Update battery
-        robot.battery = max(0, robot.battery - 0.01)
-        if robot.battery < 20:
-            robot.status = "charging"
-
-        # Update stability
         robot.stability_score = min(1.0, max(0.5, 1.0 - abs(robot.imu_pitch) - abs(robot.imu_roll)))
-
-        # Occasional payload
-        if random.random() < 0.001:
-            robot.has_payload = not robot.has_payload
-            robot.payload_weight_kg = random.uniform(5, 40) if robot.has_payload else 0
-            robot.gripper_state = "holding" if robot.has_payload else "idle"
-
-        # Increment keyframes occasionally
         if random.random() < 0.01:
             robot.slam_keyframes += 1
 
         # Keep within bounds
-        robot.x = max(-48, min(48, robot.x))
-        robot.y = max(-48, min(48, robot.y))
+        robot.x = max(-95, min(95, robot.x))
+        robot.y = max(-95, min(95, robot.y))
+
+    def _distance(self, robot: SimRobot, target: tuple) -> float:
+        return math.sqrt((target[0] - robot.x)**2 + (target[1] - robot.y)**2)
+
+    def _move_towards(self, robot: SimRobot, target: tuple, dt: float):
+        """Move robot towards a target point with obstacle avoidance."""
+        dx = target[0] - robot.x
+        dy = target[1] - robot.y
+        dist = math.sqrt(dx*dx + dy*dy)
+        if dist < 0.5:
+            robot.linear_vel = 0
+            robot.angular_vel = 0
+            return
+
+        target_theta = math.atan2(dy, dx)
+
+        # Obstacle avoidance: check if path ahead is blocked
+        lookahead = min(dist, 15.0)
+        next_x = robot.x + math.cos(target_theta) * lookahead
+        next_y = robot.y + math.sin(target_theta) * lookahead
+
+        # Check if next position hits an obstacle
+        blocked = self._is_blocked(next_x, next_y)
+
+        if blocked:
+            # Try steering left or right
+            for steer_angle in [0.8, -0.8, 1.5, -1.5, 2.5, -2.5]:
+                alt_theta = target_theta + steer_angle
+                alt_x = robot.x + math.cos(alt_theta) * lookahead
+                alt_y = robot.y + math.sin(alt_theta) * lookahead
+                if not self._is_blocked(alt_x, alt_y):
+                    target_theta = alt_theta
+                    break
+
+        angle_diff = target_theta - robot.theta
+        while angle_diff > math.pi: angle_diff -= 2 * math.pi
+        while angle_diff < -math.pi: angle_diff += 2 * math.pi
+
+        robot.angular_vel = angle_diff * 0.5 + random.uniform(-0.05, 0.05)
+        robot.linear_vel = min(1.2, dist * 0.15) + random.uniform(-0.03, 0.03)
+
+        # Check if next step would enter obstacle - stop if blocked at close range
+        step_x = robot.x + robot.linear_vel * math.cos(robot.theta) * dt
+        step_y = robot.y + robot.linear_vel * math.sin(robot.theta) * dt
+        if self._is_blocked(step_x, step_y):
+            robot.linear_vel = 0.1  # creep slowly
+        else:
+            robot.theta += robot.angular_vel * dt
+            robot.x = step_x
+            robot.y = step_y
+
+    def _is_blocked(self, x: float, y: float) -> bool:
+        """Check if a point is inside any obstacle."""
+        margin = 2.0  # extra clearance around obstacles
+        for (x1, y1, x2, y2) in self.OBSTACLES:
+            if (x1 - margin) <= x <= (x2 + margin) and (y1 - margin) <= y <= (y2 + margin):
+                return True
+        return False
+
+    def _assign_task(self, robot: SimRobot, task: dict):
+        """Assign a task to a robot."""
+        if robot.task_phase != "idle":
+            return  # already busy
+        robot.current_task_id = task.get("id", "")
+        robot.task_phase = "moving_to_pickup"
+        robot.task_pickup = (task.get("pickup_x", 0), task.get("pickup_y", 0))
+        robot.task_dropoff = (task.get("dropoff_x", 0), task.get("dropoff_y", 0))
+        robot.status = "busy"
+        robot.payload_weight_kg = task.get("payload_weight_kg", 10)
+        print(f"[Sim] {robot.name} assigned task {robot.current_task_id}: "
+              f"pickup({robot.task_pickup[0]:.0f},{robot.task_pickup[1]:.0f}) → "
+              f"dropoff({robot.task_dropoff[0]:.0f},{robot.task_dropoff[1]:.0f})")
 
     async def _send_telemetry(self, robot: SimRobot):
         """Send telemetry for one robot."""
         ws = self.ws_connections.get(robot.robot_id)
-        if ws and ws.open:
+        if ws:
             try:
                 await ws.send(json.dumps(robot.to_telemetry()))
-            except Exception as e:
-                print(f"[Sim] Send error for {robot.name}: {e}")
+                # Also send task update when task phase changes
+                if robot.current_task_id and robot.task_phase in ("picking", "dropping"):
+                    await ws.send(json.dumps({
+                        "type": "task_update",
+                        "task": {
+                            "id": robot.current_task_id,
+                            "status": "in_progress" if robot.task_phase == "picking" else "completing"
+                        }
+                    }))
+            except Exception:
+                pass  # silently ignore send errors
+
+    async def _receive_commands(self, robot: SimRobot):
+        """Listen for commands from server for a specific robot."""
+        ws = self.ws_connections.get(robot.robot_id)
+        if not ws:
+            return
+        try:
+            msg = await asyncio.wait_for(ws.recv(), timeout=0.01)
+            data = json.loads(msg)
+            if data.get("type") == "execute_task":
+                self._assign_task(robot, data.get("task", {}))
+        except asyncio.TimeoutError:
+            pass
+        except websockets.ConnectionClosed:
+            pass
+        except Exception:
+            pass
 
     async def run(self, duration: Optional[float] = None):
         """Run the simulation loop."""
@@ -228,7 +352,7 @@ class MultiRobotSimulation:
 
         if not connected and not self.ws_connections:
             print("[Sim] No server connection. Robots will move but data won't be sent.")
-            print("[Sim] Start the server first: python -m server.main")
+            print("[Sim] Start the server first: cd ../Server/backend && python main.py")
 
         start_time = time.monotonic()
         last_update = start_time
@@ -249,6 +373,8 @@ class MultiRobotSimulation:
 
                 # Update all robots
                 for robot in self.robots:
+                    # Check for incoming commands
+                    await self._receive_commands(robot)
                     self._update_robot(robot, dt)
                     if robot.robot_id in self.ws_connections:
                         await self._send_telemetry(robot)

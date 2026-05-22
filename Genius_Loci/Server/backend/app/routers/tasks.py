@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional
 
-from server.app.models.database import get_db, Task as TaskModel, TaskStatus
-from server.app.schemas.schemas import TaskCreate, TaskUpdate, TaskResponse
-from server.app.services.dispatcher import TaskDispatcher
+from app.models.database import get_db, Task as TaskModel, TaskStatus
+from app.schemas.schemas import TaskCreate, TaskUpdate, TaskResponse
+from app.services.dispatcher import TaskDispatcher
 
 router = APIRouter()
 
@@ -37,7 +37,7 @@ async def list_tasks(status: Optional[str] = None, robot_id: Optional[int] = Non
 @router.post("")
 async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
     import uuid
-    from server.app.models.database import Task as TaskModel
+    from app.models.database import Task as TaskModel
 
     task_id = f"TASK-{uuid.uuid4().hex[:8].upper()}"
     t = TaskModel(

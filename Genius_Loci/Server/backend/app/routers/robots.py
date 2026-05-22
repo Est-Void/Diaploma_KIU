@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from server.app.models.database import get_db, Robot
-from server.app.schemas.schemas import RobotCreate, RobotUpdate, RobotResponse
+from app.models.database import get_db, Robot
+from app.schemas.schemas import RobotCreate, RobotUpdate, RobotResponse
 
 router = APIRouter()
 

@@ -52,52 +52,8 @@ Genius_Loci/
     │   └── gripper.py                   # Gripper state machine
     ├── communication/                   # Communication
     │   ├── __init__.py
-    │   └── zeromq_bus.py                # ZeroMQ pub/sub bus
-    ├── server/                          # FastAPI dispatch server
-    │   ├── __init__.py
-    │   ├── main.py                      # FastAPI application
-    │   └── app/
-    │       ├── __init__.py
-    │       ├── models/
-    │       │   ├── __init__.py
-    │       │   └── database.py          # SQLAlchemy models (PostgreSQL)
-    │       ├── schemas/
-    │       │   ├── __init__.py
-    │       │   └── schemas.py           # Pydantic request/response schemas
-    │       ├── routers/
-    │       │   ├── __init__.py
-    │       │   ├── auth.py              # JWT authentication
-    │       │   ├── robots.py            # Robot CRUD
-    │       │   ├── tasks.py             # Task management
-    │       │   ├── maps.py              # Map storage
-    │       │   └── logs.py              # System logs
-    │       └── services/
-    │           ├── __init__.py
-    │           ├── websocket_manager.py # WebSocket connection manager
-    │           └── dispatcher.py        # Automatic task dispatcher
-    ├── web_ais/                         # React web dashboard
-    │   ├── package.json
-    │   ├── index.html
-    │   ├── vite.config.ts
-    │   ├── tsconfig.json
-    │   └── src/
-    │       ├── main.tsx
-    │       ├── App.tsx
-    │       ├── index.css
-    │       ├── store.ts                 # Zustand state management
-    │       ├── vite-env.d.ts
-    │       ├── components/
-    │       │   ├── Layout.tsx           # Sidebar layout
-    │       │   └── RobotMap.tsx         # Leaflet map component
-    │       ├── pages/
-    │       │   ├── Dashboard.tsx        # Main dashboard
-    │       │   ├── TaskManager.tsx      # Task CRUD
-    │       │   ├── MapViewer.tsx        # Full-screen map
-    │       │   ├── RobotDetails.tsx     # Robot detail view
-    │       │   ├── LogsViewer.tsx       # Log viewer
-    │       │   └── Settings.tsx         # Settings page
-    │       └── hooks/
-    │           └── useWebSocket.ts      # WebSocket hook
+    │   ├── zeromq_bus.py                # ZeroMQ pub/sub bus (internal)
+    │   └── robot_gateway.py            # External bridge (MQTT/WS client)
     ├── requirements.txt
     └── README.md
 ```
@@ -116,24 +72,10 @@ python main.py --sim
 python main.py --real
 ```
 
-### Server
-```bash
-# Setup PostgreSQL database
-createdb genius_loci
+### Server → See `../Server/`
 
-# Start server
-python server/main.py
-
-# API documentation available at http://localhost:8000/docs
-```
-
-### Web Dashboard
-```bash
-cd web_ais
-npm install
-npm run dev
-# Open http://localhost:3000
-```
+Сервер и веб-интерфейс вынесены в отдельную директорию `Server/`.
+Инструкции по запуску — в `Server/README.md`.
 
 ## Implemented Modules
 
@@ -152,22 +94,6 @@ npm run dev
 - [x] Gripper control state machine
 - [x] ZeroMQ communication bus
 
-### Server
-- [x] FastAPI with automatic OpenAPI docs
-- [x] PostgreSQL database with SQLAlchemy ORM
-- [x] JWT authentication with role-based access
-- [x] Robot CRUD and state management
-- [x] Task creation, assignment, and tracking
-- [x] Map storage and retrieval
-- [x] System logging
-- [x] WebSocket real-time communication
-- [x] Automatic task dispatcher
+### Server & Web Dashboard → See `../Server/`
 
-### Web Dashboard
-- [x] React + TypeScript + Vite
-- [x] Leaflet interactive map with robot markers
-- [x] Real-time telemetry via WebSocket
-- [x] Task creation and management
-- [x] Robot status monitoring
-- [x] System logs viewer
-- [x] Responsive sidebar layout
+Сервер (FastAPI + PostgreSQL) и фронтенд (React) вынесены в отдельную директорию `Server/`. Коммуникация — по протоколу WebSocket, описанному в `PROTOCOL.md`.

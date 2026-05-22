@@ -48,8 +48,8 @@ class TaskDispatcher:
 
     async def _check_and_assign(self):
         """Check for pending tasks and assign to available robots."""
-        from server.app.models.database import SessionLocal
-        from server.app.models.database import Task as TaskModel, Robot, TaskStatus, RobotStatus
+        from app.models.database import SessionLocal
+        from app.models.database import Task as TaskModel, Robot, TaskStatus, RobotStatus
 
         db = SessionLocal()
         try:
@@ -121,7 +121,7 @@ class TaskDispatcher:
         """Submit a new task to the queue."""
         task_id = f"TASK-{uuid.uuid4().hex[:8].upper()}"
 
-        from server.app.models.database import SessionLocal, Task as TaskModel
+        from app.models.database import SessionLocal, Task as TaskModel
 
         db = SessionLocal()
         try:

@@ -2,7 +2,7 @@
 Hardware and system configuration for Genius Loci GenomeOS.
 
 All configurable parameters for robot hardware, sensors, navigation,
-planning, communication, server, and web AIS.
+planning and communication.
 """
 import logging
 
@@ -170,14 +170,5 @@ MQTT_CONFIG = {
 }
 
 # =============================================================================
-# Server Configuration (FastAPI + PostgreSQL)
+# Note: Server configuration is now in ../Server/backend/config.py
 # =============================================================================
-SERVER_CONFIG = {
-    "database_url": "sqlite:///./genius_loci.db",
-    "host": "0.0.0.0",
-    "port": 8000,
-    "jwt_secret": "change-this-secret-in-production",
-    "jwt_algorithm": "HS256",
-    "jwt_expire_hours": 24,
-    "cors_origins": ["http://localhost:5173"]
-}

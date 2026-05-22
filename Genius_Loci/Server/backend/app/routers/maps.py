@@ -4,7 +4,7 @@ Map management router.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from server.app.models.database import get_db, MapData
+from app.models.database import get_db, MapData
 
 router = APIRouter()
 

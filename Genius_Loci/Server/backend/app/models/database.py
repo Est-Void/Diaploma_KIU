@@ -6,7 +6,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
 from datetime import datetime
 import enum
-import config.hw_config as cfg
+import config as cfg
 
 Base = declarative_base()
 engine = create_engine(cfg.SERVER_CONFIG["database_url"])

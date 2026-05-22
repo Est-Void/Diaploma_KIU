@@ -1,2 +1,12 @@
 .env
 __pycache__
+*.pyc
+*.pyo
+logs/
+.pids/
+node_modules/
+dist/
+*.egg-info/
+venv/
+.venv/
+genius_loci.db

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime
 
-from server.app.models.database import get_db, SystemLog
+from app.models.database import get_db, SystemLog
 
 router = APIRouter()
 

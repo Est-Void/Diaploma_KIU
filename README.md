@@ -161,96 +161,38 @@ The Genius Loci project aims to create an affordable and adaptive domestic solut
 
 ## Project Structure
 
+Проект разделён на две независимые части:
+
 ```
 Genius_Loci/
-└── GenomeOS/
-    ├── main.py                      # Main robot orchestrator
-    ├── main_live_debug.py           # Debug visualization
-    ├── config/                      # Configuration files
-    │   ├── hw_config.py             # Hardware & system config
-    │   └── system_config.py
-    ├── core/                        # Core modules
-    │   ├── logger.py                # Structured JSON logging
-    │   ├── balancer.py              # Stability controller
-    │   ├── pid.py                   # PID controller
-    │   ├── navigator.py             # Navigation coordinator
-    │   ├── motion_controller.py     # Motion control
-    │   ├── mission_executor.py      # Task execution
-    │   └── indicator_controller.py  # LED/audio feedback
-    ├── navigation/                  # Navigation stack
-    │   ├── slam/                    # SLAM module
-    │   │   └── slam_module.py
-    │   └── planning/                # Path planners
-    │       ├── astar.py             # A* global planner
-    │       └── dwa.py               # DWA local planner
-    ├── perception/                  # Perception modules
-    │   ├── stereo/                  # Stereo vision
-    │   │   └── stereo_module.py
-    │   └── detection/               # Object detection
-    │       ├── aruco_detector.py
-    │       └── yolo_detector.py
-    ├── sensors/                     # Sensor emulators
-    │   ├── encoder_emulator.py
-    │   ├── imu_emulator.py
-    │   └── stereo_emulator.py
-    ├── control/                     # Control modules
-    │   ├── movement.py              # Differential drive
-    │   └── gripper.py               # Gripper control
-    ├── communication/               # Communication
-    │   ├── zeromq_bus.py            # ZeroMQ message bus
-    │   └── robot_gateway.py         # Server bridge
-    ├── hw_abstraction/              # Hardware layer
-    │   ├── hardware_interface.py
-    │   ├── wheel_motor.py
-    │   ├── limb_motor.py
-    │   ├── pneumatic_gripper.py
-    │   ├── pos_sensor.py
-    │   ├── indicators.py
-    │   ├── base_node.py
-    │   └── real_nodes.py
-    ├── server/                      # Central server
-    │   ├── main.py                  # FastAPI entry point
-    │   └── app/
-    │       ├── models/
-    │       │   └── database.py      # SQLAlchemy models
-    │       ├── schemas/
-    │       │   └── schemas.py       # Pydantic schemas
-    │       ├── routers/
-    │       │   ├── auth.py          # Authentication
-    │       │   ├── robots.py        # Robot management
-    │       │   ├── tasks.py         # Task management
-    │       │   ├── maps.py          # Map management
-    │       │   └── logs.py          # Log queries
-    │       └── services/
-    │           ├── websocket_manager.py
-    │           └── dispatcher.py    # Task dispatcher
-    ├── simulation/                  # Multi-robot simulation
-    │   └── multi_robot_sim.py       # Fleet simulator
-    ├── web_ais/                     # Web interface
-    │   ├── package.json
-    │   ├── vite.config.ts
-    │   ├── tsconfig.json
-    │   ├── index.html
-    │   └── src/
- │       ├── App.tsx               # Main app with auth routes
-    │       ├── main.tsx             # Entry point
-    │       ├── index.css            # Global styles
-    │       ├── store.ts             # Zustand state store
-    │       ├── vite-env.d.ts
-    │       ├── pages/
-    │       │   ├── Login.tsx        # Auth page
-    │       │   ├── Dashboard.tsx    # Admin dashboard
-    │       │   ├── RobotDetails.tsx # Robot telemetry
-    │       │   ├── TaskManager.tsx  # Task management
-    │       │   ├── MapViewer.tsx    # Full-screen map
-    │       │   ├── LogsViewer.tsx   # System logs
-    │       │   └── Settings.tsx     # Configuration
-    │       ├── components/
-    │       │   ├── Layout.tsx       # App shell
-    │       │   └── RobotMap.tsx     # Leaflet map
-    │       └── hooks/
-    │           └── useWebSocket.ts  # WS connection
-    └── requirements.txt             # Python dependencies
+├── GenomeOS/               # Локальная ОС робота (Python)
+│   ├── main.py             # Оркестратор
+│   ├── config/             # Конфигурация робота
+│   ├── core/               # PID, balancer, logger
+│   ├── navigation/         # SLAM, A*, DWA
+│   ├── perception/         # Stereo vision, ArUco, YOLO
+│   ├── sensors/            # Эмуляторы датчиков
+│   ├── control/            # Движение, гриппер
+│   ├── hw_abstraction/     # Абстракция железа
+│   ├── communication/      # ZeroMQ + WebSocket клиент
+│   └── simulation/         # Симуляция флота роботов
+│
+├── Server/                 # Серверная часть
+│   ├── backend/            # FastAPI + PostgreSQL
+│   │   ├── main.py
+│   │   ├── config.py
+│   │   └── app/
+│   │       ├── models/     # SQLAlchemy
+│   │       ├── schemas/    # Pydantic
+│   │       ├── routers/    # REST API
+│   │       └── services/   # WebSocket, Dispatcher
+│   └── frontend/           # React Web AIS
+│       └── src/
+│           ├── components/ # Layout, RobotMap
+│           ├── pages/      # Dashboard, Tasks, etc.
+│           └── hooks/      # useWebSocket
+│
+└── PROTOCOL.md             # API контракт GenomeOS ↔ Server
 ```
 
 ---
@@ -264,62 +206,29 @@ Genius_Loci/
 - PostgreSQL 14+ (or use SQLite for testing)
 - Git
 
-### Server Setup
+### Robot (GenomeOS)
 
-1. **Create virtual environment:**
 ```bash
 cd Genius_Loci/GenomeOS
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or: venv\Scripts\activate  # Windows
-```
-
-2. **Install dependencies:**
-```bash
 pip install -r requirements.txt
-```
-
-3. **Configure database:**
-```bash
-# Edit config/hw_config.py and set your PostgreSQL URL:
-# "database_url": "postgresql://user:password@localhost:5432/genius_loci"
-# Or use SQLite for testing: "sqlite:///./genius_loci.db"
-```
-
-4. **Run the server:**
-```bash
-cd Genius_Loci/GenomeOS
-python -m server.main
-```
-The server will start on `http://localhost:8000`
-- API docs: `http://localhost:8000/docs`
-- Health check: `http://localhost:8000/health`
-
-### Web AIS Setup
-
-1. **Install dependencies:**
-```bash
-cd Genius_Loci/GenomeOS/web_ais
-npm install
-```
-
-2. **Run development server:**
-```bash
-npm run dev
-```
-The web interface will be available at `http://localhost:5173`
-
-3. **Build for production:**
-```bash
-npm run build
-```
-
-### Robot Simulation
-
-Run a single robot in simulation mode:
-```bash
-cd Genius_Loci/GenomeOS
 python main.py --sim
+```
+
+### Server + Frontend
+
+См. `Server/README.md`:
+
+```bash
+# Backend
+cd Genius_Loci/Server/backend
+pip install -r requirements.txt
+python main.py
+# → http://localhost:8000 (Swagger: /docs)
+
+# Frontend
+cd Genius_Loci/Server/frontend
+npm install && npm run dev
+# → http://localhost:5173
 ```
 
 ---
